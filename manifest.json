@@ -40,18 +40,40 @@
     }
   ],
   "variables": {
-    "simple": [
-      "quote",
-      "character",
-      "series",
-      "series_color"
-    ]
-  },
-  "max_lengths": {
-    "quote": 120,
-    "character": 15,
-    "series": 7,
-    "series_color": 4
+    "groups": {
+      "quote_data": { "label": "Quote" },
+      "metadata": { "label": "Metadata" }
+    },
+    "simple": {
+      "quote": {
+        "description": "The Star Trek quote text",
+        "type": "string",
+        "max_length": 120,
+        "group": "quote_data",
+        "example": "Make it so."
+      },
+      "character": {
+        "description": "Character who said the quote",
+        "type": "string",
+        "max_length": 15,
+        "group": "quote_data",
+        "example": "Picard"
+      },
+      "series": {
+        "description": "Series abbreviation (tng, voyager, ds9)",
+        "type": "string",
+        "max_length": 7,
+        "group": "metadata",
+        "example": "tng"
+      },
+      "series_color": {
+        "description": "Color code for the series",
+        "type": "string",
+        "max_length": 4,
+        "group": "metadata",
+        "example": "{67}"
+      }
+    }
   },
   "color_rules_schema": {
     "series": {
