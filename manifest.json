@@ -41,8 +41,12 @@
   ],
   "variables": {
     "groups": {
-      "quote_data": { "label": "Quote" },
-      "metadata": { "label": "Metadata" }
+      "quote_data": {
+        "label": "Quote"
+      },
+      "metadata": {
+        "label": "Metadata"
+      }
     },
     "simple": {
       "quote": {
@@ -98,5 +102,13 @@
       ]
     }
   },
-  "fiestaboard_version": ">=2.10.0"
+  "fiestaboard_version": ">=2.10.0",
+  "screenshots": [
+    {
+      "src": "docs/board-display.png",
+      "alt": "Star Trek Quotes displayed on a Vestaboard",
+      "caption": "Display random Star Trek quotes from TNG, Voyager, and DS9",
+      "primary": true
+    }
+  ]
 }
