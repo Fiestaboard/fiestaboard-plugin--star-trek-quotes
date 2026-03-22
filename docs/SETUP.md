@@ -172,7 +172,7 @@ Create a centered quote display:
 
 ### Display Example
 
-![Star Trek Quotes Display](./star-trek-quotes-display.png)
+![Star Trek Quotes Display](./board-display.png)
 
 *Example showing a centered quote with character attribution on the FiestaBoard.*
 
