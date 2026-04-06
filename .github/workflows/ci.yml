@@ -38,6 +38,15 @@ jobs:
           print('manifest.json is valid')
           "
 
+      - name: Set up plugin directory structure
+        run: |
+          PLUGIN_ID=$(python -c "import json; print(json.load(open('manifest.json'))['id'])")
+          mkdir -p plugins
+          ln -s .. "plugins/$PLUGIN_ID"
+          ln -s . "$PLUGIN_ID"
+          # Symlink the quotes data file from fiestaboard-core
+          ln -sf fiestaboard-core/src/utils/star_trek_quotes.json quotes.json
+
       - name: Run tests
         env:
           PYTHONPATH: "fiestaboard-core:${{ github.workspace }}:fiestaboard-core/plugins"
