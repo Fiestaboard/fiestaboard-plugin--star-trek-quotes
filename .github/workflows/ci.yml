@@ -44,6 +44,8 @@ jobs:
           mkdir -p plugins
           ln -s .. "plugins/$PLUGIN_ID"
           ln -s . "$PLUGIN_ID"
+          # Symlink the quotes data file from fiestaboard-core
+          ln -sf fiestaboard-core/src/utils/star_trek_quotes.json quotes.json
 
       - name: Run tests
         env:
