@@ -1,7 +1,7 @@
 {
   "id": "star_trek_quotes",
   "name": "Star Trek Quotes",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Display random Star Trek quotes from TNG, Voyager, and DS9",
   "author": "FiestaBoard Team",
   "repository": "https://github.com/Fiestaboard/fiestaboard-plugin--star-trek-quotes",
