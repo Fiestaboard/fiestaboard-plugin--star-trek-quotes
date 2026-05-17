@@ -1,7 +1,7 @@
 {
   "id": "star_trek_quotes",
   "name": "Star Trek Quotes",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Display random Star Trek quotes from TNG, Voyager, and DS9",
   "author": "FiestaBoard Team",
   "repository": "https://github.com/Fiestaboard/fiestaboard-plugin--star-trek-quotes",
@@ -112,41 +112,64 @@
     }
   ],
   "demo": {
-    "name": "Star Trek Quotes Demo",
-    "device_type": "flagship",
-    "template": [
-      "",
-      "{{star_trek_quotes.quote}}",
-      "",
-      "",
-      "{{star_trek_quotes.character}}",
-      "{{star_trek_quotes.series}} {{star_trek_quotes.series_color}}"
-    ],
-    "line_metadata": [
-      {
-        "alignment": "center",
-        "wrap": false
-      },
-      {
-        "alignment": "center",
-        "wrap": true
-      },
-      {
-        "alignment": "center",
-        "wrap": false
-      },
-      {
-        "alignment": "center",
-        "wrap": false
-      },
-      {
-        "alignment": "right",
-        "wrap": false
-      },
-      {
-        "alignment": "right",
-        "wrap": false
-      }
-    ]
+    "flagship": {
+      "name": "Star Trek Quotes Demo",
+      "template": [
+        "",
+        "{{star_trek_quotes.quote}}",
+        "",
+        "",
+        "{{star_trek_quotes.character}}",
+        "{{star_trek_quotes.series}} {{star_trek_quotes.series_color}}"
+      ],
+      "line_metadata": [
+        {
+          "alignment": "center",
+          "wrap": false
+        },
+        {
+          "alignment": "center",
+          "wrap": true
+        },
+        {
+          "alignment": "center",
+          "wrap": false
+        },
+        {
+          "alignment": "center",
+          "wrap": false
+        },
+        {
+          "alignment": "right",
+          "wrap": false
+        },
+        {
+          "alignment": "right",
+          "wrap": false
+        }
+      ]
+    },
+    "note": {
+      "name": "Star Trek (Note)",
+      "template": [
+        "{{star_trek_quotes.quote}}",
+        "",
+        "{{star_trek_quotes.character}}"
+      ],
+      "line_metadata": [
+        {
+          "alignment": "left",
+          "wrap": true
+        },
+        {
+          "alignment": "left",
+          "wrap": false
+        },
+        {
+          "alignment": "left",
+          "wrap": false
+        }
+      ]
+    }
   }
 }
