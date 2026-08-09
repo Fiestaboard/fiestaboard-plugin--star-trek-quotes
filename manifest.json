@@ -120,6 +120,28 @@
       "primary": true
     }
   ],
+  "teaser": "MAKE IT SO.",
+  "previews": [
+    {
+      "device_type": "flagship",
+      "rows": [
+        "{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}{68}",
+        "THE NEEDS OF THE MANY",
+        " OUTWEIGH THE NEEDS",
+        "      OF THE FEW",
+        "",
+        "       - MR SPOCK"
+      ]
+    },
+    {
+      "device_type": "note",
+      "rows": [
+        "{65}STAR TREK",
+        "MAKE IT SO.",
+        "- PICARD"
+      ]
+    }
+  ],
   "demo": {
     "flagship": {
       "name": "Star Trek Quotes Demo",
