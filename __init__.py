@@ -39,22 +39,26 @@ class StarTrekQuotesPlugin(PluginBase):
         return "star_trek_quotes"
     
     def _load_quotes(self) -> None:
-        """Load quotes from JSON file."""
+        """Load quotes from the JSON file shipped alongside this plugin.
+
+        The data file must live in the plugin directory.  There is deliberately
+        no fallback to the platform's ``src/utils/star_trek_quotes.json``: that
+        path only resolved while this plugin was bundled inside the FiestaBoard
+        repo, and silently failing over to it hid the fact that ``quotes.json``
+        was never shipped to users.
+        """
         try:
-            # Try loading from plugin directory first
-            plugin_dir = Path(__file__).parent
-            quotes_file = plugin_dir / "quotes.json"
-            
+            quotes_file = Path(__file__).parent / "quotes.json"
+
             if not quotes_file.exists():
-                # Fall back to legacy location
-                legacy_file = Path(__file__).parent.parent.parent / "src" / "utils" / "star_trek_quotes.json"
-                if legacy_file.exists():
-                    quotes_file = legacy_file
-                else:
-                    logger.warning("Star Trek quotes file not found")
-                    self._quotes = {"tng": [], "voyager": [], "ds9": []}
-                    return
-            
+                logger.error(
+                    "Star Trek quotes data missing: expected %s. The plugin "
+                    "install is incomplete; reinstall the plugin.",
+                    quotes_file,
+                )
+                self._quotes = {"tng": [], "voyager": [], "ds9": []}
+                return
+
             with open(quotes_file, 'r') as f:
                 self._quotes = json.load(f)
             
