@@ -150,3 +150,23 @@ def test_formatted_display_renders_when_installed_externally(
     assert rows is not None, "no board output from an external install"
     assert any(row.strip() for row in rows), "board output is entirely blank"
     assert all(len(row) <= 22 for row in rows), f"row exceeds board width: {rows}"
+
+
+def test_manifest_declares_the_quote_data():
+    """Declaring quotes.json lets FiestaBoard reject a broken install.
+
+    Without the declaration the platform can only notice the file is missing
+    by scanning this module's source, which is a heuristic. With it, an
+    install that lacks the file is refused outright.
+    """
+    manifest = json.loads((REPO_ROOT / "manifest.json").read_text())
+    assert "quotes.json" in manifest.get("data_files", []), (
+        "manifest.json must declare quotes.json under data_files"
+    )
+
+
+def test_every_declared_data_file_actually_ships():
+    """The declaration must describe reality, not intent."""
+    manifest = json.loads((REPO_ROOT / "manifest.json").read_text())
+    for rel in manifest.get("data_files", []):
+        assert (REPO_ROOT / rel).is_file(), f"declared data file {rel!r} does not exist"

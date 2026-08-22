@@ -6,6 +6,9 @@
   "author": "FiestaBoard Team",
   "repository": "https://github.com/Fiestaboard/fiestaboard-plugin--star-trek-quotes",
   "documentation": "README.md",
+  "data_files": [
+    "quotes.json"
+  ],
   "icon": "star",
   "category": "entertainment",
   "min_refresh_seconds": 30,
