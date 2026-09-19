@@ -1,381 +1,247 @@
-"""Tests for the star_trek_quotes plugin."""
+"""Tests for the star_trek_quotes plugin.
+
+Everything here exercises ``plugins.star_trek_quotes`` and the ``quotes.json``
+this repo ships. The platform's ``src/utils/star_trek_quotes.py`` (and its
+copy of the quote data) was a pre-extraction leftover and is gone; nothing
+below imports from ``src.utils``.
+"""
+
+import json
+import random
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
-from unittest.mock import patch, Mock, MagicMock
-import json
-from pathlib import Path
 
-from src.utils.star_trek_quotes import (
-    StarTrekQuotesSource,
-    get_star_trek_quotes_source
-)
+from plugins.star_trek_quotes import Plugin, StarTrekQuotesPlugin
 
-# Also test the plugin itself
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
-from plugins.star_trek_quotes import StarTrekQuotesPlugin
+REPO_ROOT = Path(__file__).resolve().parent.parent
+MANIFEST_PATH = REPO_ROOT / "manifest.json"
+QUOTES_PATH = REPO_ROOT / "quotes.json"
+SERIES = ("tng", "voyager", "ds9")
 
 
-class TestStarTrekQuotesSource:
-    """Tests for StarTrekQuotesSource class."""
-    
-    def test_init(self):
-        """Test source initialization."""
-        source = StarTrekQuotesSource()
-        assert source is not None
-    
-    def test_get_random_quote(self):
-        """Test getting a random quote."""
-        source = StarTrekQuotesSource()
-        quote = source.get_random_quote()
-        
-        assert quote is not None
-        assert "quote" in quote or "text" in quote or isinstance(quote, str)
-    
-    def test_quote_has_required_fields(self):
-        """Test quote data structure has required fields."""
-        source = StarTrekQuotesSource()
-        quote = source.get_random_quote()
-        
-        if isinstance(quote, dict):
-            # Should have quote text
-            assert any(k in quote for k in ["quote", "text", "line"])
-            # Optionally has character/speaker
-            # assert any(k in quote for k in ["character", "speaker", "author"])
-    
-    def test_quotes_file_exists(self):
-        """Test that quotes data file exists."""
-        quotes_file = Path(__file__).parent.parent.parent.parent.parent / "src" / "utils" / "star_trek_quotes.json"
-        # Check if file exists or quotes are embedded
-        # This might vary based on implementation
-        pass
-    
-    def test_quote_not_empty(self):
-        """Test that quotes are not empty strings."""
-        source = StarTrekQuotesSource()
-        quote = source.get_random_quote()
-        
-        if isinstance(quote, dict):
-            quote_text = quote.get("quote") or quote.get("text") or ""
-        else:
-            quote_text = str(quote)
-        
-        assert len(quote_text) > 0
-    
-    def test_multiple_random_quotes_vary(self):
-        """Test that random quotes can vary."""
-        source = StarTrekQuotesSource()
-        
-        # Get multiple quotes
-        quotes = [source.get_random_quote() for _ in range(10)]
-        
-        # Convert to strings for comparison
-        quote_texts = []
-        for q in quotes:
-            if isinstance(q, dict):
-                quote_texts.append(q.get("quote") or q.get("text") or str(q))
-            else:
-                quote_texts.append(str(q))
-        
-        # Should have some variety (not all identical)
-        unique_quotes = set(quote_texts)
-        # With 10 pulls, we should likely get at least 2 different quotes
-        # unless the pool is very small
-        assert len(unique_quotes) >= 1
+def _manifest():
+    with open(MANIFEST_PATH) as f:
+        return json.load(f)
 
 
-class TestQuoteFormatting:
-    """Tests for quote formatting."""
-    
-    def test_quote_fits_display(self):
-        """Test that quotes fit within board constraints."""
-        max_line_length = 22
-        max_lines = 6
-        
-        source = StarTrekQuotesSource()
-        quote_data = source.get_random_quote()
-        
-        if isinstance(quote_data, dict):
-            quote_text = quote_data.get("quote") or quote_data.get("text") or ""
-        else:
-            quote_text = str(quote_data)
-        
-        # Quote should be renderable (may need word wrap)
-        assert len(quote_text) > 0
-    
-    def test_character_name_display(self):
-        """Test character name is displayed with quote."""
-        source = StarTrekQuotesSource()
-        quote_data = source.get_random_quote()
-        
-        if isinstance(quote_data, dict):
-            # Character might be in various fields
-            character_fields = ["character", "speaker", "author", "who"]
-            has_character = any(f in quote_data for f in character_fields)
-            # Character is optional but common
-            pass
+def _shipped_quotes():
+    with open(QUOTES_PATH) as f:
+        return json.load(f)
 
 
-class TestGetStarTrekQuotesSource:
-    """Tests for get_star_trek_quotes_source factory function."""
-    
-    def test_factory_returns_instance(self):
-        """Test factory returns an instance."""
-        source = get_star_trek_quotes_source()
-        # Source should be returned (may be None if disabled)
-        if source is not None:
-            assert isinstance(source, StarTrekQuotesSource)
-    
-    def test_factory_behavior_depends_on_config(self):
-        """Test factory returns source based on config."""
-        source = get_star_trek_quotes_source()
-        # Source may be None if not enabled in config
-        if source is not None:
-            assert isinstance(source, StarTrekQuotesSource)
+@pytest.fixture
+def plugin():
+    return StarTrekQuotesPlugin(_manifest())
+
+
+class TestPluginConstruction:
+    """What the platform does with this package: import ``Plugin`` and build it."""
+
+    def test_module_exports_the_plugin_class(self):
+        assert Plugin is StarTrekQuotesPlugin
+
+    def test_plugin_id_matches_manifest(self, plugin):
+        assert plugin.plugin_id == _manifest()["id"] == "star_trek_quotes"
+
+    def test_loads_the_shipped_quotes_on_construction(self, plugin):
+        """The plugin reads its own quotes.json, not a platform copy."""
+        assert plugin._quotes == _shipped_quotes()
+
+    def test_every_series_has_quotes(self, plugin):
+        for series in SERIES:
+            assert plugin._quotes[series], f"{series} has no quotes"
 
 
 class TestQuoteData:
-    """Tests for quote data integrity."""
-    
-    def test_quotes_not_empty_list(self):
-        """Test that quotes collection is not empty."""
-        source = StarTrekQuotesSource()
-        
-        # Try to get a quote, which should work if we have quotes
-        quote = source.get_random_quote()
-        assert quote is not None
-    
-    def test_quotes_are_strings(self):
-        """Test that quote text is a string."""
-        source = StarTrekQuotesSource()
-        quote_data = source.get_random_quote()
-        
-        if isinstance(quote_data, dict):
-            quote_text = quote_data.get("quote") or quote_data.get("text")
-            if quote_text:
-                assert isinstance(quote_text, str)
-        else:
-            assert isinstance(quote_data, str)
-    
-    def test_no_html_in_quotes(self):
-        """Test that quotes don't contain HTML."""
-        source = StarTrekQuotesSource()
-        quote_data = source.get_random_quote()
-        
-        if isinstance(quote_data, dict):
-            quote_text = quote_data.get("quote") or quote_data.get("text") or ""
-        else:
-            quote_text = str(quote_data)
-        
-        # Should not contain HTML tags
-        assert "<" not in quote_text or ">" not in quote_text
+    """Integrity of the quote data the plugin ships and serves."""
 
-
-class TestStarTrekQuotesPlugin:
-    """Tests for the StarTrekQuotesPlugin class."""
-    
-    @pytest.fixture
-    def plugin(self):
-        """Create a plugin instance."""
-        manifest = {
-            "id": "star_trek_quotes",
-            "name": "Star Trek Quotes",
-            "version": "1.0.0"
-        }
-        return StarTrekQuotesPlugin(manifest)
-    
-    def test_plugin_initialization(self, plugin):
-        """Test plugin initializes correctly."""
-        assert plugin.plugin_id == "star_trek_quotes"
-        assert plugin._quotes is not None
-    
-    def test_fetch_data_returns_all_variables(self, plugin):
-        """Test fetch_data returns all expected variables."""
-        result = plugin.fetch_data()
-        
-        assert result.available is True
-        assert result.data is not None
-        assert "quote" in result.data
-        assert "character" in result.data
-        assert "series" in result.data
-        assert "series_color" in result.data
-    
-    def test_quote_variable_not_empty(self, plugin):
-        """Test quote variable contains text."""
-        result = plugin.fetch_data()
-        
-        assert result.available is True
-        quote = result.data["quote"]
-        
-        # Quote should not be empty
-        assert len(quote) > 0
-        assert isinstance(quote, str)
-    
-    def test_character_variable_not_empty(self, plugin):
-        """Test character variable contains text."""
-        result = plugin.fetch_data()
-        
-        assert result.available is True
-        character = result.data["character"]
-        
-        # Character should not be empty
-        assert len(character) > 0
-        assert isinstance(character, str)
-    
-    def test_validate_config_valid_ratio(self, plugin):
-        """Test config validation with valid ratio."""
-        config = {"ratio": "3:5:9"}
-        errors = plugin.validate_config(config)
-        assert len(errors) == 0
-    
-    def test_validate_config_invalid_ratio(self, plugin):
-        """Test config validation with invalid ratio."""
-        config = {"ratio": "invalid"}
-        errors = plugin.validate_config(config)
-        assert len(errors) > 0
-    
-    def test_series_color_mapping(self, plugin):
-        """Test series color codes are set correctly."""
-        result = plugin.fetch_data()
-        
-        assert result.available is True
-        series_color = result.data["series_color"]
-        
-        # Should be a color code (format: {XX})
-        assert series_color.startswith("{")
-        assert series_color.endswith("}")
-    
-    def test_all_quotes_reasonable_length(self, plugin):
-        """Test that all quotes are reasonable length for display."""
-        # Test every quote in the actual data file
-        for series, quotes_list in plugin._quotes.items():
-            for quote_obj in quotes_list:
-                quote = quote_obj["quote"]
-                
-                # Quote should be under 120 characters (as defined in manifest)
-                assert len(quote) <= 120, (
-                    f"Quote too long: [{series}] {quote[:50]}... "
-                    f"has {len(quote)} chars, max 120"
+    def test_every_quote_has_non_empty_text_and_character(self, plugin):
+        for series, quotes in plugin._quotes.items():
+            for entry in quotes:
+                assert isinstance(entry["quote"], str) and entry["quote"].strip(), (
+                    f"empty quote in {series}: {entry}"
                 )
-    
+                assert isinstance(entry["character"], str) and entry["character"].strip(), (
+                    f"missing character in {series}: {entry}"
+                )
+
+    def test_no_html_in_quotes(self, plugin):
+        for series, quotes in plugin._quotes.items():
+            for entry in quotes:
+                assert "<" not in entry["quote"] and ">" not in entry["quote"], (
+                    f"HTML in {series} quote: {entry['quote']!r}"
+                )
+
+    def test_all_quotes_fit_the_manifest_max_length(self, plugin):
+        max_length = _manifest()["variables"]["simple"]["quote"]["max_length"]
+        for series, quotes in plugin._quotes.items():
+            for entry in quotes:
+                assert len(entry["quote"]) <= max_length, (
+                    f"Quote too long: [{series}] {entry['quote'][:50]}... "
+                    f"has {len(entry['quote'])} chars, max {max_length}"
+                )
+
     def test_all_character_names_reasonable_length(self, plugin):
-        """Test that all character names are reasonable length."""
-        for series, quotes_list in plugin._quotes.items():
-            for quote_obj in quotes_list:
-                character = quote_obj["character"]
-                
-                # Character names should be under 15 chars (as defined in manifest)
-                # This is reasonable for the display
-                assert len(character) <= 20, (
-                    f"Character name too long: [{series}] {character} "
-                    f"has {len(character)} chars"
+        for series, quotes in plugin._quotes.items():
+            for entry in quotes:
+                assert len(entry["character"]) <= 20, (
+                    f"Character name too long: [{series}] {entry['character']}"
                 )
 
-    def test_validate_config_ratio_wrong_format(self, plugin):
-        """Test config validation with ratio not in N:N:N format."""
-        config = {"ratio": "1:2"}
-        errors = plugin.validate_config(config)
-        assert "Ratio must be in format" in errors[0]
 
-    def test_validate_config_ratio_non_integer(self, plugin):
-        """Test config validation with non-integer ratio parts."""
-        config = {"ratio": "1:2:a"}
-        errors = plugin.validate_config(config)
-        assert "Ratio parts must be integers" in errors[0]
-
-    def test_parse_ratio_custom_config(self, plugin):
-        """Test _parse_ratio with custom ratio from config."""
-        plugin.config = {"ratio": "1:2:3"}
-        tng, voyager, ds9 = plugin._parse_ratio()
-        assert (tng, voyager, ds9) == (1, 2, 3)
-
-    def test_parse_ratio_invalid_returns_default(self, plugin):
-        """Test _parse_ratio returns default when config is invalid."""
-        plugin.config = {"ratio": "not-valid"}
-        tng, voyager, ds9 = plugin._parse_ratio()
-        assert (tng, voyager, ds9) == (3, 5, 9)
-
-    def test_parse_ratio_wrong_parts_returns_default(self, plugin):
-        """Test _parse_ratio returns default when parts count is wrong."""
-        plugin.config = {"ratio": "1:2"}
-        tng, voyager, ds9 = plugin._parse_ratio()
-        assert (tng, voyager, ds9) == (3, 5, 9)
-
-    def test_fetch_data_returns_unavailable_when_no_quotes(self, plugin):
-        """Test fetch_data returns unavailable when _quotes is empty."""
-        plugin._quotes = {"tng": [], "voyager": [], "ds9": []}
+class TestFetchData:
+    def test_returns_every_manifest_variable(self, plugin):
         result = plugin.fetch_data()
-        assert result.available is False
-        assert "No quotes available" in result.error
+        assert result.available is True
+        assert set(result.data) == set(_manifest()["variables"]["simple"])
 
-    def test_fetch_data_reloads_when_quotes_empty(self, plugin):
-        """Test fetch_data calls _load_quotes when _quotes is None/empty."""
-        plugin._quotes = None
-        result = plugin.fetch_data()
-        # After reload, quotes should be loaded from file (or empty if file missing)
-        assert plugin._quotes is not None
+    def test_serves_a_quote_from_the_shipped_data(self, plugin):
+        data = plugin.fetch_data().data
+        series = data["series"].lower()
+        assert series in SERIES
+        shipped = {(q["quote"], q["character"]) for q in _shipped_quotes()[series]}
+        assert (data["quote"], data["character"]) in shipped
 
-    def test_fetch_data_fallback_when_series_empty(self, plugin):
-        """Test fetch_data falls back when selected series has no quotes."""
-        # Use a single series with quotes, others empty - force selection of empty
+    def test_quote_and_character_are_non_empty_strings(self, plugin):
+        data = plugin.fetch_data().data
+        assert isinstance(data["quote"], str) and data["quote"]
+        assert isinstance(data["character"], str) and data["character"]
+
+    def test_series_is_upper_cased(self, plugin):
+        data = plugin.fetch_data().data
+        assert data["series"] in {s.upper() for s in SERIES}
+
+    @pytest.mark.parametrize(
+        "ratio,series,color",
+        [
+            ("1:0:0", "TNG", "{67}"),  # blue
+            ("0:1:0", "VOYAGER", "{64}"),  # orange
+            ("0:0:1", "DS9", "{68}"),  # violet
+        ],
+    )
+    def test_series_color_is_the_series_own_colour(self, plugin, ratio, series, color):
+        plugin.config = {"ratio": ratio}
+        data = plugin.fetch_data().data
+        assert (data["series"], data["series_color"]) == (series, color)
+
+    def test_series_color_is_a_board_color_code(self, plugin):
+        color = plugin.fetch_data().data["series_color"]
+        assert color.startswith("{") and color.endswith("}")
+        assert color[1:-1].isdigit()
+
+    def test_repeated_fetches_vary(self, plugin):
+        random.seed(1234)
+        quotes = {plugin.fetch_data().data["quote"] for _ in range(20)}
+        assert len(quotes) > 1
+
+    def test_ratio_weights_series_selection(self, plugin):
+        """A 0:0:1 ratio only ever draws from DS9."""
+        plugin.config = {"ratio": "0:0:1"}
+        assert {plugin.fetch_data().data["series"] for _ in range(20)} == {"DS9"}
+
+    def test_falls_back_to_another_series_when_the_chosen_one_is_empty(self, plugin):
         plugin._quotes = {
             "tng": [{"quote": "Test.", "character": "Picard"}],
             "voyager": [],
             "ds9": [],
         }
-        plugin.config = {"ratio": "0:1:0"}  # Only voyager in pool
+        plugin.config = {"ratio": "0:1:0"}  # only voyager in the pool
         result = plugin.fetch_data()
-        # Should fall back to tng since voyager is empty
         assert result.available is True
         assert result.data["quote"] == "Test."
+        assert result.data["series"] == "TNG"
 
-    def test_fetch_data_exception_handling(self, plugin):
-        """Test fetch_data handles exceptions gracefully."""
-        with patch("plugins.star_trek_quotes.random.choice") as mock_choice:
-            mock_choice.side_effect = RuntimeError("Random error")
-            result = plugin.fetch_data()
-        assert result.available is False
-        assert "Random error" in result.error
-
-    def test_get_formatted_display_returns_lines(self, plugin):
-        """Test get_formatted_display returns formatted lines."""
-        lines = plugin.get_formatted_display()
-        assert lines is not None
-        assert len(lines) <= 6
-        assert any("-" in line for line in lines)  # Character attribution
-
-    def test_get_formatted_display_long_quote_wrapping(self, plugin):
-        """Test get_formatted_display word-wraps long quotes."""
-        plugin._quotes = {
-            "tng": [{
-                "quote": "This is a very long quote that should definitely wrap "
-                         "across multiple lines when displayed on the board.",
-                "character": "Picard",
-            }],
-            "voyager": [],
-            "ds9": [],
-        }
-        plugin.config = {"ratio": "1:0:0"}
-        lines = plugin.get_formatted_display()
-        assert lines is not None
-        assert len(lines) <= 6
-
-    def test_get_formatted_display_returns_none_when_no_quotes(self, plugin):
-        """Test get_formatted_display returns None when no quotes available."""
-        plugin._quotes = {"tng": [], "voyager": [], "ds9": []}
-        lines = plugin.get_formatted_display()
-        assert lines is None
-
-    def test_fetch_data_all_series_empty_no_fallback(self, plugin):
-        """Test fetch_data when all series are empty - no quotes to fall back to."""
+    def test_unavailable_when_there_are_no_quotes(self, plugin):
         plugin._quotes = {"tng": [], "voyager": [], "ds9": []}
         result = plugin.fetch_data()
         assert result.available is False
         assert "No quotes available" in result.error
 
-    def test_load_quotes_file_not_found(self):
-        """Test _load_quotes when quotes file does not exist."""
-        manifest = {"id": "star_trek_quotes", "name": "Star Trek Quotes", "version": "1.0.0"}
+    def test_reloads_quotes_when_cache_is_empty(self, plugin):
+        plugin._quotes = None
+        result = plugin.fetch_data()
+        assert plugin._quotes == _shipped_quotes()
+        assert result.available is True
+
+    def test_exception_is_reported_not_raised(self, plugin):
+        with patch("plugins.star_trek_quotes.random.choice", side_effect=RuntimeError("Random error")):
+            result = plugin.fetch_data()
+        assert result.available is False
+        assert "Random error" in result.error
+
+
+class TestRatio:
+    def test_validate_config_accepts_default_ratio(self, plugin):
+        assert plugin.validate_config({"ratio": "3:5:9"}) == []
+
+    def test_validate_config_rejects_non_ratio(self, plugin):
+        assert plugin.validate_config({"ratio": "invalid"}) == [
+            "Ratio must be in format N:N:N (e.g., 3:5:9)"
+        ]
+
+    def test_validate_config_rejects_two_parts(self, plugin):
+        assert "Ratio must be in format" in plugin.validate_config({"ratio": "1:2"})[0]
+
+    def test_validate_config_rejects_non_integer_parts(self, plugin):
+        assert plugin.validate_config({"ratio": "1:2:a"}) == ["Ratio parts must be integers"]
+
+    def test_parse_ratio_reads_config(self, plugin):
+        plugin.config = {"ratio": "1:2:3"}
+        assert plugin._parse_ratio() == (1, 2, 3)
+
+    def test_parse_ratio_defaults_when_unset(self, plugin):
+        plugin.config = {}
+        assert plugin._parse_ratio() == (3, 5, 9)
+
+    def test_parse_ratio_defaults_on_garbage(self, plugin):
+        plugin.config = {"ratio": "not-valid"}
+        assert plugin._parse_ratio() == (3, 5, 9)
+
+    def test_parse_ratio_defaults_on_wrong_part_count(self, plugin):
+        plugin.config = {"ratio": "1:2"}
+        assert plugin._parse_ratio() == (3, 5, 9)
+
+    def test_parse_ratio_defaults_when_not_a_string(self, plugin):
+        plugin.config = {"ratio": 12345}
+        assert plugin._parse_ratio() == (3, 5, 9)
+
+
+class TestFormattedDisplay:
+    def test_renders_at_most_six_rows_with_attribution(self, plugin):
+        lines = plugin.get_formatted_display()
+        assert lines is not None
+        assert len(lines) == 6
+        assert lines[-1].strip().startswith("- ")
+        assert all(len(line) <= 22 for line in lines)
+
+    def test_word_wraps_a_long_quote(self, plugin):
+        plugin._quotes = {
+            "tng": [
+                {
+                    "quote": "This is a very long quote that should definitely wrap "
+                    "across multiple lines when displayed on the board.",
+                    "character": "Picard",
+                }
+            ],
+            "voyager": [],
+            "ds9": [],
+        }
+        plugin.config = {"ratio": "1:0:0"}
+        lines = plugin.get_formatted_display()
+        assert len(lines) == 6
+        assert lines[1] == "This is a very long"
+        assert lines[-1].endswith("- Picard")
+        assert all(len(line) <= 22 for line in lines)
+
+    def test_returns_none_when_no_quotes(self, plugin):
+        plugin._quotes = {"tng": [], "voyager": [], "ds9": []}
+        assert plugin.get_formatted_display() is None
+
+
+class TestLoadQuotes:
+    def test_missing_file_yields_empty_series(self):
         real_exists = Path.exists
 
         def mock_exists(self):
@@ -384,60 +250,41 @@ class TestStarTrekQuotesPlugin:
             return real_exists(self)
 
         with patch.object(Path, "exists", mock_exists):
-            plugin = StarTrekQuotesPlugin(manifest)
+            plugin = StarTrekQuotesPlugin(_manifest())
         assert plugin._quotes == {"tng": [], "voyager": [], "ds9": []}
 
-    def test_load_quotes_exception_handling(self):
-        """Test _load_quotes handles file read exceptions."""
-        manifest = {"id": "star_trek_quotes", "name": "Star Trek Quotes", "version": "1.0.0"}
+    def test_unreadable_file_yields_empty_series(self):
+        manifest = _manifest()  # read before json.load is patched
         with patch("plugins.star_trek_quotes.json.load", side_effect=OSError("Read error")):
             plugin = StarTrekQuotesPlugin(manifest)
         assert plugin._quotes == {"tng": [], "voyager": [], "ds9": []}
-
-    def test_parse_ratio_attribute_error(self, plugin):
-        """Test _parse_ratio when ratio config is not a string (no split method)."""
-        plugin.config = {"ratio": 12345}  # int has no split
-        tng, voyager, ds9 = plugin._parse_ratio()
-        assert (tng, voyager, ds9) == (3, 5, 9)
 
 
 class TestManifestMetadata:
     """Tests for the rich metadata format in the manifest."""
 
     def test_manifest_uses_dict_simple_format(self):
-        manifest_path = Path(__file__).parent.parent / "manifest.json"
-        with open(manifest_path) as f:
-            manifest = json.load(f)
-        simple = manifest["variables"]["simple"]
+        simple = _manifest()["variables"]["simple"]
         assert isinstance(simple, dict), "simple should use the rich dict format"
 
     def test_all_variables_have_descriptions(self):
-        manifest_path = Path(__file__).parent.parent / "manifest.json"
-        with open(manifest_path) as f:
-            manifest = json.load(f)
-        simple = manifest["variables"]["simple"]
-        for var_name, meta in simple.items():
-            assert "description" in meta and meta["description"], \
+        for var_name, meta in _manifest()["variables"]["simple"].items():
+            assert "description" in meta and meta["description"], (
                 f"Variable '{var_name}' missing description"
+            )
 
     def test_all_variables_have_valid_groups(self):
-        manifest_path = Path(__file__).parent.parent / "manifest.json"
-        with open(manifest_path) as f:
-            manifest = json.load(f)
+        manifest = _manifest()
         groups = set(manifest["variables"].get("groups", {}).keys())
-        simple = manifest["variables"]["simple"]
-        for var_name, meta in simple.items():
+        for var_name, meta in manifest["variables"]["simple"].items():
             group = meta.get("group", "")
             if group:
-                assert group in groups, \
+                assert group in groups, (
                     f"Variable '{var_name}' references undefined group '{group}'"
+                )
 
     def test_groups_are_defined(self):
-        manifest_path = Path(__file__).parent.parent / "manifest.json"
-        with open(manifest_path) as f:
-            manifest = json.load(f)
-        groups = manifest["variables"].get("groups", {})
+        groups = _manifest()["variables"].get("groups", {})
         assert len(groups) > 0, "Manifest should define at least one group"
         for group_id, group_def in groups.items():
             assert "label" in group_def, f"Group '{group_id}' missing label"
-
