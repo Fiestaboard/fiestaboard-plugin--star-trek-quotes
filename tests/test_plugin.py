@@ -13,6 +13,8 @@ from unittest.mock import patch
 
 import pytest
 
+from src.devices import BoardContext
+
 from plugins.star_trek_quotes import Plugin, StarTrekQuotesPlugin
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -209,7 +211,10 @@ class TestRatio:
 
 
 class TestFormattedDisplay:
-    def test_renders_at_most_six_rows_with_attribution(self, plugin):
+    """get_formatted_display() with no board bound defaults to a Flagship
+    (22x6) -- see TestFormattedDisplayBoardAdaptivity for other geometries."""
+
+    def test_renders_exactly_six_rows_with_attribution(self, plugin):
         lines = plugin.get_formatted_display()
         assert lines is not None
         assert len(lines) == 6
@@ -231,13 +236,111 @@ class TestFormattedDisplay:
         plugin.config = {"ratio": "1:0:0"}
         lines = plugin.get_formatted_display()
         assert len(lines) == 6
-        assert lines[1] == "This is a very long"
+        assert lines[0] == "This is a very long"
         assert lines[-1].endswith("- Picard")
         assert all(len(line) <= 22 for line in lines)
+        # The quote overflows the 5-line content budget (6 rows - 1 for the
+        # attribution). The overflow is folded into the last content line
+        # and abbreviated with an ellipsis -- visibly cut, not silently
+        # dropped the way the old hardcoded-width version did.
+        assert lines[4].endswith("…")
 
     def test_returns_none_when_no_quotes(self, plugin):
         plugin._quotes = {"tng": [], "voyager": [], "ds9": []}
         assert plugin.get_formatted_display() is None
+
+
+class TestFormattedDisplayBoardAdaptivity:
+    """get_formatted_display() derives its layout from self.board.
+
+    Regression coverage for the board-geometry fix: the quote wrap width
+    and the number of content lines used to be hardcoded to the Flagship's
+    22x6, which cut long quotes to 5 lines even on a 24-row panel and could
+    overflow a 15-wide Note. Layout must instead come from board.cols and
+    board.rows.
+    """
+
+    @staticmethod
+    def _set_single_quote(plugin, quote: str, character: str) -> None:
+        plugin._quotes = {"tng": [{"quote": quote, "character": character}], "voyager": [], "ds9": []}
+        plugin.config = {"ratio": "1:0:0"}
+
+    def test_note_uses_15_cols_and_2_content_lines(self, plugin):
+        self._set_single_quote(plugin, "Make it so.", "Picard")
+        with plugin._bound_board(BoardContext.from_device_type("note")):
+            lines = plugin.get_formatted_display()
+        assert len(lines) == 3  # note is 3 rows
+        assert all(len(line) <= 15 for line in lines)
+        assert lines[-1].strip().endswith("- Picard")
+
+    def test_note_abbreviates_a_quote_that_does_not_fit(self, plugin):
+        self._set_single_quote(
+            plugin, "The needs of the many outweigh the needs of the few.", "Mr Spock"
+        )
+        with plugin._bound_board(BoardContext.from_device_type("note")):
+            lines = plugin.get_formatted_display()
+        assert len(lines) == 3
+        assert all(len(line) <= 15 for line in lines)
+        assert lines[1].endswith("…")
+        assert lines[-1].strip().endswith("- Mr Spock")
+
+    def test_tall_note_array_shows_more_of_the_same_quote_than_a_note(self, plugin):
+        """A tall_narrow 15x12 array is the same width as a Note but 4x
+        taller. The same quote that a Note must abbreviate should render in
+        full on the array -- more rows must be used, not left blank."""
+        quote = "The needs of the many outweigh the needs of the few."
+        self._set_single_quote(plugin, quote, "Mr Spock")
+
+        with plugin._bound_board(BoardContext.from_device_type("note")):
+            note_lines = plugin.get_formatted_display()
+        with plugin._bound_board(BoardContext(device_type="note_array", rows=12, cols=15)):
+            array_lines = plugin.get_formatted_display()
+
+        assert len(array_lines) == 12
+        assert all(len(line) <= 15 for line in array_lines)
+        # The Note had to ellipsize; the taller array has room to spell the
+        # whole quote out and does not.
+        assert any(line.endswith("…") for line in note_lines)
+        assert not any(line.endswith("…") for line in array_lines)
+        assert "".join(array_lines).count("Spock") == 1
+
+    def test_wide_short_array_gets_one_wide_content_line(self, plugin):
+        """A wide-short 120x3 array: plenty of width, only 3 rows."""
+        self._set_single_quote(plugin, "Make it so.", "Picard")
+        with plugin._bound_board(BoardContext(device_type="note_array", rows=3, cols=120)):
+            lines = plugin.get_formatted_display()
+        assert len(lines) == 3
+        assert all(len(line) <= 120 for line in lines)
+        assert lines[0] == "Make it so."
+
+    def test_unbound_board_defaults_to_flagship(self, plugin):
+        self._set_single_quote(plugin, "Make it so.", "Picard")
+        assert plugin.board is None
+        lines = plugin.get_formatted_display()
+        assert len(lines) == 6
+        assert all(len(line) <= 22 for line in lines)
+
+    def test_attribution_is_truncated_with_an_ellipsis_when_too_long_for_the_board(self, plugin):
+        """'- ' plus a long character name can exceed a Note's 15 cols even
+        though the manifest's per-character max_length (15) alone would fit
+        -- the '- ' prefix is the two tiles the old fixed-width code never
+        accounted for either."""
+        self._set_single_quote(plugin, "Make it so.", "Captain Jean-Luc")
+        with plugin._bound_board(BoardContext.from_device_type("note")):
+            lines = plugin.get_formatted_display()
+        assert len(lines) == 3
+        assert all(len(line) <= 15 for line in lines)
+        assert lines[-1].strip().endswith("…")
+
+    def test_a_single_word_wider_than_the_board_is_hard_broken(self, plugin):
+        """Word-wrap must never emit a row wider than the board even when a
+        single token (a very narrow Note, or an unusually long word) can't
+        fit on one line by itself."""
+        self._set_single_quote(plugin, "Supercalifragilisticexpialidocious is not in the show.", "Data")
+        with plugin._bound_board(BoardContext.from_device_type("note")):
+            lines = plugin.get_formatted_display()
+        assert len(lines) == 3
+        assert all(len(line) <= 15 for line in lines)
 
 
 class TestLoadQuotes:

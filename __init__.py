@@ -9,9 +9,62 @@ import json
 import random
 from pathlib import Path
 
+from src.devices import BoardContext
 from src.plugins.base import PluginBase, PluginResult
+from src.text_to_board import count_tiles
 
 logger = logging.getLogger(__name__)
+
+
+def _wrap_text(text: str, width: int) -> List[str]:
+    """Word-wrap *text* to at most *width* tiles per line.
+
+    Greedy word wrap measured in tiles (``count_tiles``), not characters, so
+    a colour marker would count as one tile if the text ever carried one.
+    Never drops a word here -- that job belongs to :func:`_fit_lines`, which
+    knows the line budget and can abbreviate visibly instead of silently.
+    """
+    width = max(1, width)
+    lines: List[str] = []
+    current = ""
+    for word in text.split():
+        candidate = f"{current} {word}".strip()
+        if count_tiles(candidate) <= width:
+            current = candidate
+            continue
+        if current:
+            lines.append(current)
+            current = ""
+        # A single word wider than the board (rare, but a narrow Note makes
+        # it more likely) must still be hard-broken -- a row wider than the
+        # board is a conformance failure, not just an ugly one.
+        while count_tiles(word) > width:
+            lines.append(word[:width])
+            word = word[width:]
+        current = word
+    if current:
+        lines.append(current)
+    return lines or [""]
+
+
+def _fit_lines(lines: List[str], max_lines: int, width: int) -> List[str]:
+    """Fit *lines* into *max_lines*, abbreviating rather than dropping content.
+
+    When everything fits, ``lines`` is returned unchanged. When it doesn't,
+    the lines that don't fit are folded into the last available line and
+    trimmed to *width* with a trailing ellipsis, so a reader sees the quote
+    was cut rather than getting a quietly truncated sentence.
+    """
+    max_lines = max(1, max_lines)
+    if len(lines) <= max_lines:
+        return lines
+
+    kept = lines[: max_lines - 1]
+    overflow = " ".join(lines[max_lines - 1 :])
+    if count_tiles(overflow) > width:
+        overflow = overflow[: max(0, width - 1)].rstrip() + "…"
+    kept.append(overflow)
+    return kept
 
 
 class StarTrekQuotesPlugin(PluginBase):
@@ -161,41 +214,39 @@ class StarTrekQuotesPlugin(PluginBase):
             )
     
     def get_formatted_display(self) -> Optional[List[str]]:
-        """Return default formatted quote display."""
+        """Return a formatted quote display sized to the current board.
+
+        ``self.board`` is unset (``None``) outside a board-scoped render --
+        unit tests and legacy callers both hit this -- so that case is
+        treated as a Flagship (22x6), the platform's own default. Every
+        other dimension is derived from ``board.cols``/``board.rows``: a
+        Note gets two lines of quote and a truncated-with-ellipsis
+        attribution if needed, while a tall note_array panel gets as many
+        wrapped lines as it has rows for, instead of being cut to five.
+        """
         result = self.fetch_data()
         if not result.available or not result.data:
             return None
-        
+
         data = result.data
         quote = data["quote"]
         character = data["character"]
-        
-        # Word wrap quote to fit
-        lines = [""]  # Start with empty line
-        words = quote.split()
-        current_line = ""
-        
-        for word in words:
-            if len(current_line) + len(word) + 1 <= 22:
-                current_line = f"{current_line} {word}".strip()
-            else:
-                if len(lines) < 5:
-                    lines.append(current_line)
-                    current_line = word
-                else:
-                    break
-        
-        if current_line and len(lines) < 5:
-            lines.append(current_line)
-        
-        # Pad to 5 lines (leaving room for character)
-        while len(lines) < 5:
+
+        board = self.board or BoardContext.from_device_type("flagship")
+        cols = board.cols
+        # Every row but the last is quote text; the last is the attribution.
+        content_budget = max(1, board.rows - 1)
+
+        lines = _fit_lines(_wrap_text(quote, cols), content_budget, cols)
+        while len(lines) < content_budget:
             lines.append("")
-        
-        # Add character attribution
-        lines.append(f"- {character}"[:22].rjust(22))
-        
-        return lines[:6]
+
+        attribution = f"- {character}"
+        if count_tiles(attribution) > cols:
+            attribution = attribution[: max(0, cols - 1)].rstrip() + "…"
+        lines.append(attribution.rjust(cols))
+
+        return lines
 
 
 # Export the plugin class
